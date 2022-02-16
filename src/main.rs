@@ -1,59 +1,9 @@
+use cats_crud_cli_rust::{
+    repository::cat_store::{Cat, CatStorage},
+    repository::sql_store::SqlStorage,
+};
 use clap::{Parser, Subcommand};
-use rusqlite::{Connection, Result};
-
-/*
-    router
-*/
-
-fn main() -> Result<()> {
-    let args = CommandLineInterface::parse();
-    match &args.command {
-        Commands::Create { name } => {
-            let cat = Cat {
-                name: name.to_string(),
-            };
-            let path = "database/sqlite/cats.db";
-            let mut conn = Connection::open(path)?;
-            let id = insert_into_cats_tx(&cat, &mut conn)?;
-            println!("created a cat with id: {:?}", id);
-            Ok(())
-        }
-        Commands::Read { id } => {
-            let cats = match id {
-                Some(value) => {
-                    let path = "database/sqlite/cats.db";
-                    let mut conn = Connection::open(path)?;
-                    select_cats_by_id(value.to_string(), &mut conn)?
-                }
-                None => {
-                    let path = "database/sqlite/cats.db";
-                    let mut conn = Connection::open(path)?;
-                    select_cats(&mut conn)?
-                }
-            };
-            println!("read the following cats: {:?}", cats);
-            Ok(())
-        }
-        Commands::Update { id, name } => {
-            let path = "database/sqlite/cats.db";
-            let mut conn = Connection::open(path)?;
-            let update_count = update_cats_tx(id.to_string(), name.to_string(), &mut conn)?;
-            println!("updated {:?} cats", update_count);
-            Ok(())
-        }
-        Commands::Delete { id } => {
-            let path = "database/sqlite/cats.db";
-            let mut conn = Connection::open(path)?;
-            delete_cats_by_id_tx(id.to_string(), &mut conn)?;
-            println!("deleted cat with id: {:?}", id);
-            Ok(())
-        }
-    }
-}
-
-/*
-    data models
-*/
+use rusqlite::Result;
 
 #[derive(Parser, Debug)]
 struct CommandLineInterface {
@@ -63,72 +13,61 @@ struct CommandLineInterface {
 
 #[derive(Subcommand, Debug)]
 enum Commands {
-    Create { name: String },
-    Read { id: Option<String> },
-    Update { id: String, name: String },
-    Delete { id: String },
+    Create {
+        name: String,
+    },
+    Read {
+        id_opt: Option<String>,
+    },
+    Update {
+        id: String,
+        name: String,
+    },
+    Delete {
+        id: String,
+    },
 }
 
-#[derive(Debug)]
-struct Cat {
-    name: String,
-}
+fn main() -> Result<()> {
+    let args = CommandLineInterface::parse();
+    let cat_storage: SqlStorage = CatStorage::new("./database/sqlite/cats.db");
+    match &args.command {
+        Commands::Create { name } => {
+            let requested_cat = Cat {
+                name: name.to_string(),
+            };
 
-/*
-    sqlite commands
-*/
+            match cat_storage.create(requested_cat) {
+                Ok(new_cat) => println!("{:?}", new_cat),
+                Err(err) => println!("{:?}", err),
+            };
+            Ok(())
+        }
+        Commands::Read { id_opt } => {
+            match cat_storage.read(id_opt.to_owned()) {
+                Ok(cats) => println!("{:?}", cats),
+                Err(err) => println!("{:?}", err),
+            }
 
-fn insert_into_cats_tx(cat: &Cat, conn: &mut Connection) -> Result<String> {
-    let tx = conn.transaction()?;
-    tx.execute(
-        "CREATE TABLE IF NOT EXISTS cats (
-            id integer PRIMARY KEY,
-            name text NOT NULL
-        )",
-        [],
-    )?;
-    tx.execute("INSERT INTO cats (name) VALUES (?1)", [&cat.name])?;
-    let last_id = tx.last_insert_rowid().to_string();
+            Ok(())
+        }
+        Commands::Update { id, name } => {
+            let updated_cat = Cat {
+                name: name.to_string(),
+            };
+            match cat_storage.update(id.to_owned(), updated_cat) {
+                Ok(updated_cat) => println!("{:?}", updated_cat),
+                Err(err) => println!("{:?}", err),
+            }
 
-    tx.commit()?;
-
-    Ok(last_id)
-}
-
-fn select_cats_by_id(id: String, conn: &mut Connection) -> Result<Vec<Cat>> {
-    let mut statement = conn.prepare("SELECT * FROM cats WHERE id = ?")?;
-    let mut rows = statement.query(rusqlite::params![id])?;
-    let mut cats = Vec::new();
-    while let Some(row) = rows.next()? {
-        cats.push(Cat { name: row.get(1)? });
+            Ok(())
+        }
+        Commands::Delete { id } => {
+            match cat_storage.delete(id.to_owned()) {
+                Ok(()) => println!("deleted!"),
+                Err(err) => println!("{:?}", err),
+            }
+            Ok(())
+        }
     }
-
-    Ok(cats)
-}
-
-fn select_cats(conn: &mut Connection) -> Result<Vec<Cat>> {
-    let mut statement = conn.prepare("SELECT * FROM cats")?;
-    let mut rows = statement.query([])?;
-    let mut cats = Vec::new();
-    while let Some(row) = rows.next()? {
-        cats.push(Cat { name: row.get(1)? });
-    }
-
-    Ok(cats)
-}
-
-fn update_cats_tx(id: String, name: String, conn: &mut Connection) -> Result<usize> {
-    let tx = conn.transaction()?;
-    let rows_updated = tx.execute("UPDATE cats SET name = (?1) WHERE id = (?2)", [name, id])?;
-    tx.commit()?;
-
-    Ok(rows_updated)
-}
-
-fn delete_cats_by_id_tx(id: String, conn: &mut Connection) -> Result<()> {
-    let tx = conn.transaction()?;
-    tx.execute("DELETE FROM cats WHERE id = (?1)", [id])?;
-    tx.commit()?;
-
-    Ok(())
 }

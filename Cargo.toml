@@ -1,5 +1,5 @@
 [package]
-name = "cats-crud-cli-rust"
+name = "cats_crud_cli_rust"
 version = "0.1.0"
 edition = "2021"
 
