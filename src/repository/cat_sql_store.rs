@@ -5,7 +5,7 @@
 /// there is no ORM in use for the sake of this application, just a database driver
 /// 
 /// for a production application i would look to find a database driver which supports
-/// async/await in order to not hold up clients on long running queries.
+/// async/await in an effort to free clients on long running queries.
 /// 
 use crate::repository::cat_store::Cat;
 use rusqlite::{Connection, Error as RusqliteError, Result};

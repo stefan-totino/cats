@@ -1,5 +1,5 @@
 ///
-/// This module is intented to act as a layer of abstraction between modules
+/// This module is intended to act as a layer of abstraction between modules
 /// which interact with disk storage or memory, and the higher level
 /// modules which interact with users or higher level programs
 /// 

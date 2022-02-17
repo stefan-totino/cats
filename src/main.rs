@@ -38,9 +38,7 @@ fn main() -> Result<(), CommandLineInterfaceError> {
     //  parse input from the command line into our CLI data models
     let args = CommandLineInterface::parse();
 
-    // the cat_store module has been coded using a trait, this allows
-    // for swappable storage sources at runtime. The left hand side of this
-    // instantiation indicates which specific type of CatStorage will be invoked.
+    // The left hand side of this instantiation indicates which specific type of CatStorage will be invoked.
     let cat_storage: SqlStorage = CatStorage::new("./database/sqlite/cats.db");
 
     match &args.command {
