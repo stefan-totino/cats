@@ -4,6 +4,7 @@ use cats_crud_cli_rust::{
 };
 use clap::{Parser, Subcommand};
 use rusqlite::Result;
+use std::num::ParseIntError;
 
 #[derive(Parser, Debug)]
 struct CommandLineInterface {
@@ -13,34 +14,27 @@ struct CommandLineInterface {
 
 #[derive(Subcommand, Debug)]
 enum Commands {
-    Create {
-        name: String,
-    },
-    Read {
-        id_opt: Option<String>,
-    },
-    Update {
-        id: String,
-        name: String,
-    },
-    Delete {
-        id: String,
-    },
+    Create { name: String },
+    Read { id_opt: Option<String> },
+    Update { id: String, name: String },
+    Delete { id: String },
 }
 
-fn main() -> Result<()> {
+#[derive(Debug)]
+enum CommandLineInterfaceError {
+    ParseInt(ParseIntError),
+}
+
+fn main() -> Result<(), CommandLineInterfaceError> {
     let args = CommandLineInterface::parse();
     let cat_storage: SqlStorage = CatStorage::new("./database/sqlite/cats.db");
     match &args.command {
         Commands::Create { name } => {
-            let requested_cat = Cat {
-                name: name.to_string(),
-            };
-
-            match cat_storage.create(requested_cat) {
+            match cat_storage.create(name.to_string()) {
                 Ok(new_cat) => println!("{:?}", new_cat),
                 Err(err) => println!("{:?}", err),
             };
+
             Ok(())
         }
         Commands::Read { id_opt } => {
@@ -53,6 +47,9 @@ fn main() -> Result<()> {
         }
         Commands::Update { id, name } => {
             let updated_cat = Cat {
+                id: id
+                    .parse::<i32>()
+                    .map_err(CommandLineInterfaceError::ParseInt)?,
                 name: name.to_string(),
             };
             match cat_storage.update(id.to_owned(), updated_cat) {
@@ -64,9 +61,10 @@ fn main() -> Result<()> {
         }
         Commands::Delete { id } => {
             match cat_storage.delete(id.to_owned()) {
-                Ok(()) => println!("deleted!"),
+                Ok(()) => println!("The cat who had an id of [{:?}] has been deleted!", id),
                 Err(err) => println!("{:?}", err),
             }
+
             Ok(())
         }
     }
